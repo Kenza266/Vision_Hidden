@@ -128,6 +128,4 @@ if slider == 'Receiver' and image is not None and message != '':
         st.image(new_img.astype(np.uint8), caption='Shape: '+str(new_img.shape)+', type:'+str(new_img.dtype)) 
         decoded_message = decode(new_img, type)
         st.write('Decoded message: ' + decoded_message)
-        with st.expander('Encoded message'):
-            st.image(enc_message.astype(np.uint8)) 
         
