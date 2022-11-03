@@ -3,12 +3,16 @@ import numpy as np
 import cv2
 
 
-def char_generator(message, type):
+def char_generator(message, option):
     for c in message:
-        if type == 'RGBA':
+        if option == 'RGBA':
             yield ord(c)
-        elif type == 'YCbCr':
+        elif option == 'YCbCr':
             yield c
+
+def modifyBit(n, p, b):
+    mask = 1 << p
+    return (n & ~mask) | ((b << p) & mask)
 
 def encode_message(message):
     message_b = [np.binary_repr(int(ord(m)), width=8) for m in message]
@@ -27,8 +31,8 @@ def load_image(image_file):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR).astype(np.uint16)
     return img
 
-def encode_pixel(byte, pixel, type):
-    if type == 'RGBA':
+def encode_pixel(byte, pixel, option):
+    if option == 'RGBA':
         r = (byte&3)
         g = (byte&12)>>2
         b = (byte&48)>>4
@@ -38,57 +42,61 @@ def encode_pixel(byte, pixel, type):
                 g+(pixel[1]&252),\
                 b+(pixel[2]&252),\
                 a+(pixel[3]&252))
-    elif type == 'YCbCr':
-        return (byte<<4)+(pixel&199)
+    elif option == 'YCbCr':
+        pixel = modifyBit(pixel, 0, 1)
+        pixel = modifyBit(pixel, 1, 1)
+        pixel = modifyBit(pixel, 2, 1)
+        pixel = modifyBit(pixel, 3, 0)
+        return (byte<<4)+(pixel&65487)
 
-def decode_from_pixel(pixel, type):
-    if type == 'RGBA':
+def decode_from_pixel(pixel, option):
+    if option == 'RGBA':
         r = pixel[0]&3
         g = pixel[1]&3
         b = pixel[2]&3
         a = pixel[3]&3
         return chr(r + (g<<2) + (b<<4) + (a<<6))
-    elif type == 'YCbCr':
+    elif option == 'YCbCr':
         return int(np.binary_repr((pixel&48)>>4))
 
-def encode(image, message, type):
+def encode(image, message, option):
     encoded_image = image.copy()
-    if type == 'RGBA':
-        message = char_generator(message, type)
+    if option == 'RGBA':
+        message = char_generator(message, option)
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 try:
-                    encoded_image[i][j] = encode_pixel(next(message), image[i][j], type)
+                    encoded_image[i][j] = encode_pixel(next(message), image[i][j], option)
                 except StopIteration:
                     encoded_image[i][j] = [0, 0, 0, 0]
-                    return encoded_image, np.zeros_like(image)
-    elif type == 'YCbCr':
+                    return encoded_image, cv2.cvtColor(encoded_image, cv2.COLOR_RGBA2RGB)
+    elif option == 'YCbCr':
         message = encode_message(message)
-        message = char_generator(message, type)
+        message = char_generator(message, option)
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 try:
-                    encoded_image[i][j][1] = encode_pixel(next(message), image[i][j][1], type)
+                    encoded_image[i][j][1] = encode_pixel(next(message), image[i][j][1], option)
                 except StopIteration:
                     encoded_image[i][j][1] = 0
-                    return encoded_image, np.zeros_like(image)
-    
+                    return encoded_image, cv2.cvtColor(encoded_image, cv2.COLOR_YCR_CB2RGB)
 
-def decode(image, type):
-    if type == 'RGBA':
+def decode(image, option):
+    if option == 'RGBA':
         message = ''
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 if(all(image[i][j]) == all([0, 0, 0, 0])):
                     return message
-                message += decode_from_pixel(image[i][j], type)
-    elif type == 'YCbCr':
+                message += decode_from_pixel(image[i][j], option)
+    elif option == 'YCbCr':
         message = []
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 if(image[i][j][1] == 0):
                     return decode_message(message)
-                message.append(decode_from_pixel(image[i][j][1], type))
+                message.append(decode_from_pixel(image[i][j][1], option))
+
 
 st.set_page_config(layout='wide')
 st.title('Hidden Message')
@@ -102,14 +110,11 @@ except:
     image = cv2.imread('Test_Image.jpg').astype(np.uint16)
     message = 'Test message'
 
-type = st.selectbox(
+image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+option = st.selectbox(
     'Please choose the encoding technique',
     ('RGBA', 'YCbCr'))
-
-if type == 'RGBA':
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGBA).astype(np.uint16)
-elif type == 'YCbCr':
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2YCR_CB).astype(np.uint16)
 
 og_img_col, slider_col, new_img_col = st.columns([2, 1, 2])
 
@@ -121,11 +126,16 @@ with og_img_col:
 with slider_col:
     slider = st.select_slider('Send', options=['Sender', 'Receiver'], label_visibility='hidden')
 
+if option == 'RGBA':
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2RGBA).astype(np.uint16)
+elif option == 'YCbCr':
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2YCR_CB).astype(np.uint16)
+
 if slider == 'Receiver' and image is not None and message != '':
-    new_img, enc_message = encode(image, message, type)
+    new_img, enc_message = encode(image, message, option)
     with new_img_col:
         st.write('Image containing the message')
-        st.image(new_img.astype(np.uint8), caption='Shape: '+str(new_img.shape)+', type:'+str(new_img.dtype)) 
-        decoded_message = decode(new_img, type)
+        st.image(enc_message.astype(np.uint8), caption='Shape: '+str(enc_message.shape)+', type:'+str(enc_message.dtype)) 
+        decoded_message = decode(new_img, option)
         st.write('Decoded message: ' + decoded_message)
         
