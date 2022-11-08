@@ -50,12 +50,12 @@ def encode_rgba(image, message):
                 encoded_image[i][j] = [0, 0, 0, 0]
                 return encoded_image, cv2.cvtColor(encoded_image, cv2.COLOR_RGBA2RGB)
 
-def decode(image):
+def decode_rgba(image):
     message = []
     for i in range(image.shape[0]):
         for j in range(image.shape[1]):
             if(all(image[i][j]) == all([0, 0, 0, 0])):
-                return message
+                return np.array(message).reshape(100,100)
             message.append(decode_from_pixel_rgba(image[i][j]))
 
 
@@ -104,7 +104,7 @@ def decode_ycbr(image):
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
                 if(len(message)==10000):#all(image[i][j]) == all([0, 0, 0])):
-                    return message
+                    return np.array(message).reshape(100,100)
                 test = len(message)
                 message.append(decode_from_pixel_ycbr(image[i][j]))
 
