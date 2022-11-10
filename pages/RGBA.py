@@ -7,14 +7,14 @@ st.title('Hidden Message')
 
 try:
     file = st.file_uploader('Choose an image')
-    if (file is not None):
-        tfile = tempfile.NamedTemporaryFile(delete=False)
-        tfile.write(file.read())
-        name = tfile.name
-        st.write('please wait reading image ...')
-        image = cv2.cvtColor(cv2.imread(name), cv2.COLOR_BGR2RGB)
+    tfile = tempfile.NamedTemporaryFile(delete=False)
+    tfile.write(file.read())
+    name = tfile.name
+    st.write('please wait reading image ...')
+    image = cv2.cvtColor(cv2.imread(name), cv2.COLOR_BGR2RGB)
 except:
     image = cv2.imread('Test_Image.jpg').astype(np.uint16)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     message = 'Test message'
 
 st.image(image)
