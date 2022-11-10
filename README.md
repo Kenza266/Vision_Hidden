@@ -1,2 +1,2 @@
 # Vision Hidden
-Run with streamlit run .\main.py
+Run with $ streamlit run home.py
